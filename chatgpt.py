@@ -26,9 +26,9 @@ class ChatGPT:
         chat = self.chats.setdefault(name, Chat(self.encoding, self.maxcost))
         chat.add_message('user', promt)
         
-        responce = self.ask(promt, simple=False)
+        responce = self.ask(chat.get_context(), simple=False)
 
-        chat.add_message(*responce['choices'][0]['message'].items(), responce['completion_tokens'])
+        chat.add_message(*responce['choices'][0]['message'].items(), responce['usage']['completion_tokens'])
 
         if simple:
             return responce['choices'][0]['message']['content']
