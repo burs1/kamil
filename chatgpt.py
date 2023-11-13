@@ -26,7 +26,10 @@ class ChatGPT:
         chat = self.chats.setdefault(name, Chat(self.encoding, self.maxcost))
         chat.add_message('user', promt)
         
-        responce = self.ask(chat.get_context(), simple=False)
+        responce = openai.ChatCompletion.create(
+            model=self.model,
+            messages=chat.get_context()
+        )
 
         chat.add_message(*responce['choices'][0]['message'].items(), responce['usage']['completion_tokens'])
 
@@ -46,7 +49,7 @@ class Chat:
         if cost < 0:
             cost = len(self.encoding.encode(content))
 
-        self.messages.append( {"role": role, "content": content} )
+        self.messages.append( {'role': role, 'content': content} )
         self.costs.append(cost)
 
         while sum(self.costs) > self.maxcost:
