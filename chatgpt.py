@@ -11,31 +11,39 @@ class ChatGPT:
         self.encoding = tiktoken.encoding_for_model(model)
 
     def ask(self, promt, simple=True):
-        responce = openai.ChatCompletion.create(
-            model=self.model,
-            messages=[
-                {'role': 'user', 'content': promt}
-            ]
-        )
+        try:
+            response = openai.ChatCompletion.create(
+                model=self.model,
+                messages=[
+                    {'role': 'user', 'content': promt}
+                ]
+            )
+        except Exception as e:
+            print(e)
+            return ''
 
         if simple:
-            return responce['choices'][0]['message']['content']
-        return responce
+            return response['choices'][0]['message']['content']
+        return response
 
     def ask_chat(self, name, promt, simple=True):
         chat = self.chats.setdefault(name, Chat(self.encoding, self.maxcost))
         chat.add_message('user', promt)
         
-        responce = openai.ChatCompletion.create(
-            model=self.model,
-            messages=chat.get_context()
-        )
+        try:
+            response = openai.ChatCompletion.create(
+                model=self.model,
+                messages=chat.get_context()
+            )
+        except Exception as e:
+            print(e)
+            return ''
 
-        chat.add_message(*responce['choices'][0]['message'].items(), responce['usage']['completion_tokens'])
+        chat.add_message(*response['choices'][0]['message'].items(), response['usage']['completion_tokens'])
 
         if simple:
-            return responce['choices'][0]['message']['content']
-        return responce
+            return response['choices'][0]['message']['content']
+        return response
 
 class Chat:
     messages = []
