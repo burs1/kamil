@@ -1,6 +1,6 @@
 from dns import *
 
-def weather(city):
+def get_weather(city):
     data = {'temp': '', 'state': ''}
 
     # WTF?!

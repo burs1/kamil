@@ -1,8 +1,12 @@
 #import utils
+import cfg
 import time
 import random
 import asyncio
+import chatgpt
+import botfuncs
 import threading
+import steosvoice
 
 from datetime import datetime, timedelta
 
@@ -13,6 +17,7 @@ from telegram import (
 	# ReplyKeyboardMarkup,
 	# ReplyKeyboardRemove,
 	Update,
+	User
 )
 
 from telegram.constants import ParseMode
@@ -31,11 +36,8 @@ from telegram.ext import (
 __author__ = 'Yegor Yershov'
 
 
-global TOKEN, users_cache
-TOKEN = '6940898113:AAGo5AmBgkRbK7-t_8pyZWMZg5NKnj_05rE'
+global users_cache
 #users_cache = utils.load_users_cache() # {'user_id':data...}
-
-
 
 bot_task_threads = {} # {'chat_id':TaskThread}
 
@@ -49,101 +51,104 @@ bot_task_threads = {} # {'chat_id':TaskThread}
 # 		self.arguments = function[1]
 # 		self.execution_timestamp = execution_timestamp
 
-
+class clr:
+    blue = '\033[94m'
+    cyan = '\033[96m'
+    green = '\033[92m'
+    yellow = '\033[93m'
+    red = '\033[91m'
+    white = '\033[0m'
+    bold = '\033[1m'
 
 class TasksThread(threading.Thread):
-	def __init__(self, bot_instance, chat_instance) -> None:
-		"""
-		users_to_be_pinged - list of users to be randomly pinged
-		interval - minutes per ping
-		"""
+    def __init__(self, bot_instance, chat_instance) -> None:
+        """
+        users_to_be_pinged - list of users to be randomly pinged
+        interval - minutes per ping
+        """
 
-		self.task = None
+        self.task = None
 
 		#self.ping_interval = ping_interval
-		self.bot_instance = bot_instance
-		self.chat_instance = chat_instance
+        self.bot_instance = bot_instance
+        self.chat_instance = chat_instance
 
-		self.users_to_be_pinged = None
+        self.gpt_instance = chatgpt.ChatGPT(cfg.openai_api_key)
+        self.steos_instance = steosvoice.SteosVoice(cfg.steosvoice_api_key)
+        self.steos_instance.set_voice('Дрочеслав')
+        
+        self.tasks_list = []
 
-		self.tasks_list = []
-
-		super().__init__(daemon=True)
-
-
-	async def gen_pinging_users(self) -> list[str]:
-		""" Returns list with usernames of pinging users"""
-		PING_WHITELIST = [6940898113, 1378906881, 951065997]
-
-		res = [admin.user.username for admin in await self.chat_instance.get_administrators() if (admin.user.id not in PING_WHITELIST and admin.user.username is not None)]
-		return res
+        super().__init__(daemon=True)
 
 
-	def add_task(self, function, args:tuple, execution_timestamp:datetime):
-		""" Adds new task to the list """
-		self.tasks_list.append({'timestamp':execution_timestamp, 'function':function, "args":args})
+    async def get_users(self) -> list[User]:
+        """ Returns list with usernames of users"""
+        return [admin.user for admin in await self.chat_instance.get_administrators()]
+
+    def add_task(self, function, execution_timestamp:datetime, arguments:tuple=tuple()):
+        """ Adds new task to the list """
+        # send message in console
+        print(f'{clr.yellow}New task added:{clr.white}')
+        print(f'\tfunc:', function.__name__)
+        if arguments:
+            print(f'\targs:', arguments)
+        print('\ttime:', execution_timestamp.strftime("%d.%m.%y %H:%M:%S"))
+
+        self.tasks_list.append({'timestamp':execution_timestamp, 'function':function, 'args':arguments})
+
+    async def setup_thread(self) -> None:
+        while True:
+            deletion_list = []
+            for task in self.tasks_list:
+                if datetime.now() >= task['timestamp']:
+                    await task['function'](*task['args'])
+                    deletion_list.append(task)
+
+            for task in deletion_list:
+                self.tasks_list.remove(task)
 
 
-	async def setup_thread(self) -> None:
-		self.users_to_be_pinged = await self.gen_pinging_users()
-		self.add_task(self.ping_random_user, tuple(), datetime.now())
+            time.sleep(1)
 
 
-		while True:
-			deletion_list = []
-			#print(self.tasks_list)
-			for task in self.tasks_list:
-				if datetime.now() >= task['timestamp']:
-					await task['function'](*task['args'])
-					deletion_list.append(task)
-
-			for task in deletion_list:
-				self.tasks_list.remove(task)
+    async def start_asyncio_task(self) -> None:
+        self.task = asyncio.create_task(self.setup_thread())
+        await self.task
 
 
-			time.sleep(1)
+    def stop_asyncio_task(self) -> None:
+        self.task.cancel()
+        self.join()
 
+    
+    def run(self) -> None:
+        """Initting thread"""
 
-	async def start_asyncio_task(self) -> None:
-		self.task = asyncio.create_task(self.setup_thread())
-		await self.task
-
-
-	def stop_asyncio_task(self) -> None:
-		self.task.cancel()
-		self.join()
-
-
-	def run(self):
-		"""Initting thread"""
-
-		asyncio.run(self.start_asyncio_task())
-
-
-	async def ping_random_user(self):
-		""" Mentions random user and deletes message in 3 seconds """
-		PING_INTERVAL = 30 # minutes
-		print(self.users_to_be_pinged)
-		self.users_to_be_pinged = await self.gen_pinging_users()
-		message = await self.bot_instance.send_message(self.chat_instance.id, f'@{random.choice(self.users_to_be_pinged)}')
-
-		self.add_task(self.ping_random_user, tuple(), datetime.now() + timedelta(minutes = PING_INTERVAL))
-		print(self.tasks_list[-1])
-
-		await asyncio.sleep(3)
-		await message.delete()
-
+        asyncio.run(self.start_asyncio_task())
+        
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-	user = update.message.from_user
+    user = update.message.from_user
 
-	print(f'{user.first_name} {user.last_name} {user.username} [{user.id}]')
+    if update.message.chat.id not in bot_task_threads.keys():
+        update.message.delete()
+        print(f'{clr.red}{user.username} [{user.id}]{clr.white} started bot polling')
+        
+        # create thread
+        bot_task_threads[update.message.chat.id] = TasksThread(bot_instance = context.bot, chat_instance = update.message.chat)
+        thread = bot_task_threads[update.message.chat.id]
 
-	if update.message.chat.id not in bot_task_threads.keys():
-		bot_task_threads[update.message.chat.id] = TasksThread(bot_instance = context.bot, chat_instance = update.message.chat)
+
 		#bot_task_threads[update.message.chat.id].start()
-		await bot_task_threads[update.message.chat.id].setup_thread()
+		
+		# add tasks
+        thread.add_task(botfuncs.ping_random_user, datetime.now(), arguments=(thread,))
+        thread.add_task(botfuncs.send_weather_forecast, datetime.now() + timedelta(days=1), arguments=(thread,))
+        thread.add_task(botfuncs.remind_about_shawarma, datetime.now(), arguments=(thread,datetime.now() + timedelta(days=2)))
+		
+        await thread.setup_thread()
 
 	#msg = await update.message.reply_text('hello')
 	#for i in range(100):
@@ -160,15 +165,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 	await context.bot.send_message(update.message.chat.id, 'test message')
 
 
-
+# Main 
 def main():
-	global TOKEN
-
-	application = Application.builder().token(TOKEN).build()
-	application.add_handler(CommandHandler("start", start))
-	application.add_handler(MessageHandler(filters.TEXT, handle_message))
+    print(f'{clr.green}Starting bot...')
+    
+    application = Application.builder().token(cfg.bot_token).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT, handle_message))
 	#application.add_handler(PollAnswerHandler(receive_poll_answer))
-	application.run_polling()
+	
+    print(f'{clr.cyan}Bot is online')
+    
+    application.run_polling()
 
 if __name__ == '__main__':
 	main()
