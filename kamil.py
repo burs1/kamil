@@ -147,7 +147,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		# add tasks
         thread.add_task(botfuncs.ping_random_user, datetime.now(), arguments=(thread,))
         #thread.add_task(botfuncs.send_weather_forecast, datetime.now() + timedelta(days=1), arguments=(thread,))
-        #thread.add_task(botfuncs.remind_about_shawarma, datetime.now(), arguments=(thread,datetime.now() + timedelta(days=2)))
+        thread.add_task(botfuncs.remind_about_shawarma, datetime.now(), arguments=(thread, datetime(2023, 11, 15, 11, 35)))
 		
         await thread.setup_thread()
 

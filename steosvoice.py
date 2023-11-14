@@ -5,6 +5,8 @@ Steos voice api interactor
 import os
 import httpx
 
+import urllib.request
+
 class SteosVoice():
     voice_id = 1
     base_url = 'https://api.voice.steos.io/v1/get/'
@@ -36,10 +38,10 @@ class SteosVoice():
         else:
             print(f'Voice {name} is missing!')
 
-    def synth(self, text):
+    def synth(self, text:str):
         """ Sends request to make tts """
 
-        body = {'voice_id': self.voice_id, 'text': text}
+        body = {'voice_id': self.voice_id, 'text': text, 'format':'mp3'}
 
         try:
             response = httpx.post(
@@ -54,16 +56,20 @@ class SteosVoice():
         #print(response['audio_url'])
 
         if not response['status']:
-            print(response['message'])
             return
 
         return response['audio_url']
 
 
-    def save_audio(self, link, file_destionation = './voice-cache') -> None:
-        """ Downloads audio from given link """
+    def save_audio(self, link:str, file_destionation_dir:str = 'voice-cache') -> str:
+        """ Downloads audio from given link and returns filepath"""
 
-        if not os.path.isdir(file_destionation):
-            os.mkdir(file_destionation)
+        if not os.path.isdir(file_destionation_dir):
+            os.mkdir(file_destionation_dir)
+
+        file_path = file_destionation_dir + '/' + link.split('/')[-1]
+        urllib.request.urlretrieve(link, file_path)
+
+        return file_path
 
 
