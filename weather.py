@@ -1,3 +1,5 @@
+""" Requests weather data in selected city, provided by dns.toys """
+
 from dns import *
 
 def get_weather(city):

@@ -86,6 +86,7 @@ class TasksThread(threading.Thread):
         """ Returns list with usernames of users"""
         return [admin.user for admin in await self.chat_instance.get_administrators()]
 
+
     def add_task(self, function, execution_timestamp:datetime, arguments:tuple=tuple()):
         """ Adds new task to the list """
         # send message in console
@@ -96,6 +97,7 @@ class TasksThread(threading.Thread):
         print('\ttime:', execution_timestamp.strftime("%d.%m.%y %H:%M:%S"))
 
         self.tasks_list.append({'timestamp':execution_timestamp, 'function':function, 'args':arguments})
+
 
     async def setup_thread(self) -> None:
         while True:
@@ -121,19 +123,18 @@ class TasksThread(threading.Thread):
         self.task.cancel()
         self.join()
 
-    
+
     def run(self) -> None:
         """Initting thread"""
 
         asyncio.run(self.start_asyncio_task())
-        
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
 
     if update.message.chat.id not in bot_task_threads.keys():
-        update.message.delete()
+        await update.message.delete()
         print(f'{clr.red}{user.username} [{user.id}]{clr.white} started bot polling')
         
         # create thread
@@ -145,8 +146,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		
 		# add tasks
         thread.add_task(botfuncs.ping_random_user, datetime.now(), arguments=(thread,))
-        thread.add_task(botfuncs.send_weather_forecast, datetime.now() + timedelta(days=1), arguments=(thread,))
-        thread.add_task(botfuncs.remind_about_shawarma, datetime.now(), arguments=(thread,datetime.now() + timedelta(days=2)))
+        #thread.add_task(botfuncs.send_weather_forecast, datetime.now() + timedelta(days=1), arguments=(thread,))
+        #thread.add_task(botfuncs.remind_about_shawarma, datetime.now(), arguments=(thread,datetime.now() + timedelta(days=2)))
 		
         await thread.setup_thread()
 
