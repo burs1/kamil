@@ -117,6 +117,8 @@ class TasksThread(threading.Thread):
     async def send_voice_message(self, text:str) -> bool:
         """ Generates and sends voice message made from text """
 
+        self.steos_instance.clear_cache()
+
         speech = self.steos_instance.save_audio(link = self.steos_instance.synth(text))
 
         if not speech:

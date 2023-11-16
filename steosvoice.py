@@ -43,17 +43,19 @@ class SteosVoice():
 
         body = {'voice_id': self.voice_id, 'text': text, 'format':'mp3'}
 
-        try:
-            response = httpx.post(
-                self.base_url + 'tts',
-                headers=self.headers,
-                json=body
-            ).json()
-        except Exception as e:
-            print("\n\n\n", e, "\n\n\n")
-            return
+        for i in range(10):
+            try:
+                response = httpx.post(
+                    self.base_url + 'tts',
+                    headers=self.headers,
+                    json=body
+                ).json()
+                break
+            except Exception as e:
+                print("\n\n\n", e, "\n\n\n")
+                return
 
-        #print(response)
+        print(response)
 
         if not response['status']:
             return
@@ -69,14 +71,19 @@ class SteosVoice():
 
         #print(link)
 
+        print(link)
+
         file_path = file_destionation_dir + '/' + link.split('/')[-1]
         urllib.request.urlretrieve(link, file_path)
 
         return file_path
 
 
-    def clear_cache(self, cache_dir:str = 'voice-cache'):
+    def clear_cache(self, cache_dir:str = 'voice-cache') -> None:
         """ Clears all cache of downloaded voices """
+
+        if not os.path.isdir(cache_dir):
+            return
 
         for file in os.listdir(cache_dir):
             os.remove(f"{cache_dir}/{file}")
