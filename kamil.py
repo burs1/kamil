@@ -73,8 +73,8 @@ class TasksThread(threading.Thread):
         self.bot_instance = bot_instance
         self.chat_instance = chat_instance
 
-        self.gpt_instance = chatgpt.ChatGPT(cfg.openai_api_key)
-        self.steos_instance = steosvoice.SteosVoice(cfg.steosvoice_api_key)
+        self.gpt_instance = chatgpt.ChatGPT(cfg.OPENAI_API_KEY)
+        self.steos_instance = steosvoice.SteosVoice(cfg.STEOSVOICE_API_KEY)
         self.steos_instance.set_voice('Дрочеслав')
         
         self.tasks_list = []
@@ -114,6 +114,20 @@ class TasksThread(threading.Thread):
             time.sleep(1)
 
 
+    async def send_voice_message(self, text:str) -> bool:
+        """ Generates and sends voice message made from text """
+
+        speech = self.steos_instance.save_audio(link = self.steos_instance.synth(text))
+
+        if not speech:
+            return False
+
+        await self.bot_instance.sendVoice(self.chat_instance.id, speech)
+        self.steos_instance.clear_cache()
+
+        return True
+
+
     async def start_asyncio_task(self) -> None:
         self.task = asyncio.create_task(self.setup_thread())
         await self.task
@@ -147,7 +161,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		# add tasks
         thread.add_task(botfuncs.ping_random_user, datetime.now(), arguments=(thread,))
         #thread.add_task(botfuncs.send_weather_forecast, datetime.now() + timedelta(days=1), arguments=(thread,))
-        thread.add_task(botfuncs.remind_about_shawarma, datetime.now(), arguments=(thread, datetime(2023, 11, 15, 11, 35)))
+        thread.add_task(botfuncs.remind_about_shawarma, datetime.now(), arguments=(thread, botfuncs.generate_next_shawerma_time()))
 		
         await thread.setup_thread()
 
@@ -170,9 +184,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 def main():
     print(f'{clr.green}Starting bot...')
     
-    application = Application.builder().token(cfg.bot_token).build()
+    application = Application.builder().token(cfg.BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT, handle_message))
+    #application.add_handler(MessageHandler(filters.TEXT, handle_message))
 	#application.add_handler(PollAnswerHandler(receive_poll_answer))
 	
     print(f'{clr.cyan}Bot is online')

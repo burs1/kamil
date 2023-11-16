@@ -53,7 +53,7 @@ class SteosVoice():
             print("\n\n\n", e, "\n\n\n")
             return
 
-        #print(response['audio_url'])
+        #print(response)
 
         if not response['status']:
             return
@@ -67,9 +67,20 @@ class SteosVoice():
         if not os.path.isdir(file_destionation_dir):
             os.mkdir(file_destionation_dir)
 
+        #print(link)
+
         file_path = file_destionation_dir + '/' + link.split('/')[-1]
         urllib.request.urlretrieve(link, file_path)
 
         return file_path
+
+
+    def clear_cache(self, cache_dir:str = 'voice-cache'):
+        """ Clears all cache of downloaded voices """
+
+        for file in os.listdir(cache_dir):
+            os.remove(f"{cache_dir}/{file}")
+
+        os.rmdir(cache_dir)
 
 
