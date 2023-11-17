@@ -119,7 +119,7 @@ class TasksThread(threading.Thread):
 
         self.steos_instance.clear_cache()
 
-        speech = self.steos_instance.save_audio(link = self.steos_instance.synth(text))
+        speech = self.steos_instance.synth(text, 'file')
 
         if not speech:
             return False

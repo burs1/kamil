@@ -8,27 +8,43 @@ import httpx
 import urllib.request
 
 class SteosVoice():
-    voice_id = 1
-    base_url = 'https://api.voice.steos.io/v1/get/'
+    _voice_id = 1
+    _base_url = 'https://api.voice.steos.io/v1/get/'
 
     def __init__(self, api_key) -> None:
         self.api_key = api_key
         self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': api_key}
 
+    def __request(self, url, body:dict=None, tries:int=100) -> dict:
+        response = None
+
+        for _ in range(tries):
+            try:
+                if body:
+                    response = httpx.post(self._base_url + url, headers=self.headers, json=body).json() 
+                else:
+                    response = httpx.get(self._base_url + url, headers=self.headers).json()
+                break
+            except Exception as e:
+                print('\n\n\n', e, '\n\n\n')
+ 
+        if not isinstance(response, dict) or 'status' not in response.keys():
+            print('\n\n\nInvalid response form\n\n\n')
+            return dict()
+
+        if not response['status']:
+            print('\n\n\n', response['message'], '\n\n\n')
+            return dict()
+
+        return response
+
+
     def set_voice(self, name:str) -> None:
         """ Setup voice for message """
 
-        try:
-            response = httpx.get(
-                self.base_url + 'voices',
-                headers=self.headers
-            ).json()
-        except Exception as e:
-            print(e)
-            return
+        response = self.__request('voices')
 
-        if not response['status']:
-            print(response['message'])
+        if not response:
             return
 
         for voice in response['voices']:
@@ -38,43 +54,29 @@ class SteosVoice():
         else:
             print(f'Voice {name} is missing!')
 
-    def synth(self, text:str):
+    def synth(self, text:str, mode:str) -> str:
         """ Sends request to make tts """
 
-        body = {'voice_id': self.voice_id, 'text': text, 'format':'mp3'}
+        if not mode in ['url', 'file']:
+            raise ValueError(f'Mode {mode} doesn\'t exist')
 
-        for i in range(100):
-            try:
-                print(self.base_url, self.headers, body)
-                response = httpx.post(
-                    self.base_url + 'tts',
-                    headers=self.headers,
-                    json=body
-                ).json()
-                break
-            except Exception as e:
-                print("\n\n\n", e, "\n\n\n")
+        body = {'voice_id': self._voice_id, 'text': text, 'format':'mp3'}
 
-        print(response)
+        response = self.__request('tts', body=body)
 
-        if not isinstance(response, dict) or 'status' not in response.keys():
-            return
+        if not response:
+            return ''
 
-        if not response['status']:
-            return
-
-        return response['audio_url']
+        if mode == 'url':
+            return response['audio_url']
+        return self.__save_audio(response['audio_url'])
 
 
-    def save_audio(self, link:str, file_destionation_dir:str = 'voice-cache') -> str:
+    def __save_audio(self, link:str, file_destionation_dir:str = 'voice-cache') -> str:
         """ Downloads audio from given link and returns filepath"""
 
         if not os.path.isdir(file_destionation_dir):
             os.mkdir(file_destionation_dir)
-
-        #print(link)
-
-        print(link)
 
         file_path = file_destionation_dir + '/' + link.split('/')[-1]
         urllib.request.urlretrieve(link, file_path)
