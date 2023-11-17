@@ -43,8 +43,9 @@ class SteosVoice():
 
         body = {'voice_id': self.voice_id, 'text': text, 'format':'mp3'}
 
-        for i in range(10):
+        for i in range(100):
             try:
+                print(self.base_url, self.headers, body)
                 response = httpx.post(
                     self.base_url + 'tts',
                     headers=self.headers,
@@ -53,9 +54,11 @@ class SteosVoice():
                 break
             except Exception as e:
                 print("\n\n\n", e, "\n\n\n")
-                return
 
         print(response)
+
+        if not isinstance(response, dict) or 'status' not in response.keys():
+            return
 
         if not response['status']:
             return

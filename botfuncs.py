@@ -8,7 +8,7 @@ import asyncio
 from weather import get_weather
 from datetime import datetime, timedelta
 from numbers_to_words import num2text
-from cfg import RANDPING_INTERVAL, RANDPING_WHITELIST, SHAVERMA_SCHEDULE
+from cfg import RANDPING_INTERVAL, RANDPING_WHITELIST, SHAVERMA_SCHEDULE, WEATHER_NOTIFICATION_TIME
 
 
 def time_left_in_text(time:timedelta) -> str:
@@ -48,10 +48,10 @@ async def send_weather_forecast(thread) -> None:
     RESP = {'cloudy': 'П+онебу облака распласт+ались.'}
 
     data = get_weather('novosibirsk')
-    text = f'Русы одиннадцать одиннадцатого княжества, доброе утро. Сегодня в Свежесибирске за ставнями' + data["temp"][0] + f'градусов. {RESP[data["state"]]}.'.replace('-', 'минус')
+    text = u'Русы одиннадцать одиннадцатого княжества, доброе утро. Сегодня в Свежесибирске за ставнями ' + num2text(int(float(data['temp'])), ((u'градус', u'градуса', u'градусов'), 'm')).replace('-', ' минус ') #  {RESP[data["state"]]}.
     await thread.send_voice_message(text = text)
 
-    thread.add_task(send_weather_forecast, datetime.now() + timedelta(hours=24), arguments=(thread,))
+    thread.add_task(send_weather_forecast, generate_next_weather_notification_time(), arguments=(thread,))
 
 
 async def remind_about_shawarma(thread, time) -> None:
@@ -83,7 +83,7 @@ async def remind_about_shawarma(thread, time) -> None:
 
 
 def generate_next_shawerma_time():
-    """ Gives closes shawerma visiting date in datetime.datetime format"""
+    """ Gives closest shawerma visiting date in datetime.datetime format"""
 
     now = datetime.now()
 
@@ -104,3 +104,14 @@ def generate_next_shawerma_time():
 
     return result_time
 
+
+def generate_next_weather_notification_time():
+    """ Gives next weather notification moment datetime.datetime format"""
+
+    now = datetime.now()
+
+    go_to_next_day = not (now.hour < WEATHER_NOTIFICATION_TIME['hours'] or (now.hour == WEATHER_NOTIFICATION_TIME['hours'] and now.minutes < WEATHER_NOTIFICATION_TIME['minutes']))
+    return datetime(now.year, now.month, now.day + go_to_next_day,
+                    WEATHER_NOTIFICATION_TIME['hours'],
+                    WEATHER_NOTIFICATION_TIME['minutes'],
+                    WEATHER_NOTIFICATION_TIME['seconds'])
