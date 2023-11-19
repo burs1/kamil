@@ -1,5 +1,6 @@
 #Python 3.10 or higher 
 
+vk_api
 openai
 tiktoken
 dnspython

@@ -7,13 +7,17 @@ import httpx
 
 import urllib.request
 
+
+
 class SteosVoice():
     _voice_id = 1
     _base_url = 'https://api.voice.steos.io/v1/get/'
 
+
     def __init__(self, api_key) -> None:
         self.api_key = api_key
         self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': api_key}
+
 
     def __request(self, url, body:dict=None, tries:int=100) -> dict:
         response = None
@@ -53,6 +57,7 @@ class SteosVoice():
                 break
         else:
             print(f'Voice {name} is missing!')
+
 
     def synth(self, text:str, mode:str) -> str:
         """ Sends request to make tts """

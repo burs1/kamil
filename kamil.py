@@ -100,6 +100,8 @@ class TasksThread(threading.Thread):
 
 
     async def setup_thread(self) -> None:
+        """ Initiates thread """
+
         while True:
             deletion_list = []
             for task in self.tasks_list:
@@ -112,6 +114,13 @@ class TasksThread(threading.Thread):
 
 
             time.sleep(1)
+
+
+    async def send_text_message(self, text:str) -> None:
+        """ Sends text message to the chat """
+
+        await self.bot_instance.send_message(self.chat_instance.id, text)
+
 
 
     async def send_voice_message(self, text:str) -> bool:
@@ -153,25 +162,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.delete()
         print(f'{clr.red}{user.username} [{user.id}]{clr.white} started bot polling')
         
-        # create thread
+        # CREATE THREAD
         bot_task_threads[update.message.chat.id] = TasksThread(bot_instance = context.bot, chat_instance = update.message.chat)
         thread = bot_task_threads[update.message.chat.id]
 
 
-		#bot_task_threads[update.message.chat.id].start()
-		
-		# add tasks
-        thread.add_task(botfuncs.ping_random_user, datetime.now(), arguments=(thread,))
+        # ADD TASKS
+        #thread.add_task(botfuncs.ping_random_user, datetime.now(), arguments=(thread,))
         thread.add_task(botfuncs.remind_about_shawarma, datetime.now(), arguments=(thread, botfuncs.generate_next_shawerma_time()))
-        thread.add_task(botfuncs.send_weather_forecast, botfuncs.generate_next_weather_notification_time(), arguments=(thread,))
+        thread.add_task(botfuncs.send_weather_forecast, botfuncs.generate_next_notification_time(cfg.WEATHER_NOTIFICATION_TIME), arguments=(thread,))
+        thread.add_task(botfuncs.notify_about_warmup, botfuncs.generate_next_notification_time(cfg.WARMUP_NOTIFICATION_TIME), arguments=(thread,))
 
         await thread.setup_thread()
-
-	#msg = await update.message.reply_text('hello')
-	#for i in range(100):
-		#await update.message.reply_text(' '.join(["@" + i.user.username for i in update.message.chat.get_administrators()]))
-	#users_cache[user.id] = await qf.start(context=context, chat_id=update.message.chat.id)
-	#users_cache[user.id]['id'] = user.id
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -196,4 +198,10 @@ def main():
     application.run_polling()
 
 if __name__ == '__main__':
-	main()
+    while True:
+        try:
+            main()
+        except KeyboardInterrupt:
+            raise SystemExit
+        except Exception:
+            continue

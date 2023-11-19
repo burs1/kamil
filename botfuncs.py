@@ -3,12 +3,14 @@ External task generation module
 """
 import os
 import random
+import vkfuncs
 import asyncio
 
 from weather import get_weather
-from datetime import datetime, timedelta
 from numbers_to_words import num2text
-from cfg import RANDPING_INTERVAL, RANDPING_WHITELIST, SHAVERMA_SCHEDULE, WEATHER_NOTIFICATION_TIME
+from datetime import datetime, timedelta
+from cfg import RANDPING_INTERVAL, RANDPING_WHITELIST, SHAVERMA_SCHEDULE,\
+                WEATHER_NOTIFICATION_TIME, WARMUP_NOTIFICATION_TIME
 
 
 def time_left_in_text(time:timedelta) -> str:
@@ -35,7 +37,7 @@ async def ping_random_user(thread) -> None:
         return
 
     username = random.choice(users).username
-    message = await thread.bot_instance.send_message(thread.chat_instance.id, f'@{username}')
+    message = await thread.send_text_message(f'@{username}')
 
     thread.add_task(ping_random_user, datetime.now() + timedelta(minutes = RANDPING_INTERVAL), arguments=(thread,))
 
@@ -48,10 +50,10 @@ async def send_weather_forecast(thread) -> None:
     RESP = {'cloudy': 'П+онебу облака распласт+ались.'}
 
     data = get_weather('novosibirsk')
-    text = u'Русы одиннадцать одиннадцатого княжества, доброе утро. Сегодня в Свежесибирске за ставнями ' + num2text(int(float(data['temp'])), ((u'градус', u'градуса', u'градусов'), 'm')).replace('-', ' минус ') #  {RESP[data["state"]]}.
+    text = u'Русы одиннадцать одиннадцатого княжества, доброе утро. Сегодня в Свежесибирске за ставнями ' + num2text(int(float(data['temp'])), ((u'градус', u'градуса', u'градусов'), 'm')) #  {RESP[data["state"]]}.
     await thread.send_voice_message(text = text)
 
-    thread.add_task(send_weather_forecast, generate_next_weather_notification_time(), arguments=(thread,))
+    thread.add_task(send_weather_forecast, generate_next_notification_time(WEATHER_NOTIFICATION_TIME), arguments=(thread,))
 
 
 async def remind_about_shawarma(thread, time) -> None:
@@ -82,6 +84,24 @@ async def remind_about_shawarma(thread, time) -> None:
     thread.add_task(remind_about_shawarma, new_reminder_time, arguments=(thread, time))
 
 
+async def notify_about_warmup(thread):
+    """
+    Waits for information about morning warmup
+    """
+
+
+    res = vkfuncs.get_powermorning_sesc_status()
+    if res == 2:
+        thread.add_task(notify_about_warmup, datetime.now() + timedelta(minutes = 1), arguments = (thread))
+        return
+    elif res == 1:
+        await thread.send_text_message(u'Дружина, объявляю обязательный утренний сбор на мероприятие зарядка!')
+    else:
+        await thread.send_text_message(u'Дружина, объявляю, что утренний сбор на зарядку не состоится.')
+
+    thread.add_task(notify_about_warmup, generate_next_notification_time(WARMUP_NOTIFICATION_TIME), arguments = (thread))
+
+
 def generate_next_shawerma_time():
     """ Gives closest shawerma visiting date in datetime.datetime format"""
 
@@ -91,27 +111,26 @@ def generate_next_shawerma_time():
     for weekday in SHAVERMA_SCHEDULE:
         if weekday >= now.weekday():
             result_time = datetime(now.year, now.month, now.day + (weekday - now.weekday()),
-                                                         SHAVERMA_SCHEDULE[weekday]['hours'],
-                                                         SHAVERMA_SCHEDULE[weekday]['minutes'],
-                                                         SHAVERMA_SCHEDULE[weekday]['seconds'])
+                                                         SHAVERMA_SCHEDULE[weekday]['hour'],
+                                                         SHAVERMA_SCHEDULE[weekday]['minute'],
+                                                         SHAVERMA_SCHEDULE[weekday]['second'])
 
     if result_time is None:
         weekday = min(SHAVERMA_SCHEDULE.keys())
         result_time = datetime(now.year, now.month, now.day + 7 - (now.weekday() - weekday),
-                                                         SHAVERMA_SCHEDULE[weekday]['hours'],
-                                                         SHAVERMA_SCHEDULE[weekday]['minutes'],
-                                                         SHAVERMA_SCHEDULE[weekday]['seconds'])
+                                                         SHAVERMA_SCHEDULE[weekday]['hour'],
+                                                         SHAVERMA_SCHEDULE[weekday]['minute'],
+                                                         SHAVERMA_SCHEDULE[weekday]['second'])
 
     return result_time
 
 
-def generate_next_weather_notification_time():
+def generate_next_notification_time(pattern:dict) -> datetime:
     """ Gives next weather notification moment datetime.datetime format"""
 
     now = datetime.now()
+    target_datetime = datetime(year = now.year, month=now.month, day=now.day,
+                                **pattern)
 
-    go_to_next_day = not (now.hour < WEATHER_NOTIFICATION_TIME['hours'] or (now.hour == WEATHER_NOTIFICATION_TIME['hours'] and now.minutes < WEATHER_NOTIFICATION_TIME['minutes']))
-    return datetime(now.year, now.month, now.day + go_to_next_day,
-                    WEATHER_NOTIFICATION_TIME['hours'],
-                    WEATHER_NOTIFICATION_TIME['minutes'],
-                    WEATHER_NOTIFICATION_TIME['seconds'])
+    return datetime(now.year, now.month, now.day + (now > target_datetime),
+                    **pattern)
